@@ -19,8 +19,6 @@ For a self-contained executable:
 dotnet publish .\OpenAIProfileSwitcher.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output .\dist
 ```
 
-The prebuilt executable is in `dist\OpenAIProfileSwitcher.exe`.
-
 ## Usage
 
 1. Start the launcher.
