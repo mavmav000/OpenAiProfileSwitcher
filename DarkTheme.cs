@@ -104,7 +104,7 @@ internal static class DarkTheme
             using var divider = new Pen(Border);
             e.Graphics.FillRectangle(fill, e.Bounds);
             var bounds = Rectangle.Inflate(e.Bounds, -10, 0);
-            TextRenderer.DrawText(e.Graphics, e.Header.Text, list.Font, bounds, Text,
+            TextRenderer.DrawText(e.Graphics, e.Header?.Text ?? string.Empty, list.Font, bounds, Text,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
                 TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
             e.Graphics.DrawLine(divider, e.Bounds.Right - 1, e.Bounds.Top,
@@ -117,15 +117,15 @@ internal static class DarkTheme
         list.DrawItem += (_, _) => { };
         list.DrawSubItem += (_, e) =>
         {
-            var isSelected = e.Item.Selected;
+            var isSelected = e.Item?.Selected == true;
             var background = isSelected ? Selected :
                 e.ItemIndex % 2 == 0 ? Surface : SurfaceAlternate;
             using var fill = new SolidBrush(background);
             using var divider = new Pen(Border);
             e.Graphics.FillRectangle(fill, e.Bounds);
             var bounds = Rectangle.Inflate(e.Bounds, -10, 0);
-            TextRenderer.DrawText(e.Graphics, e.SubItem.Text,
-                e.SubItem.Font ?? list.Font, bounds, Text,
+            TextRenderer.DrawText(e.Graphics, e.SubItem?.Text ?? string.Empty,
+                e.SubItem?.Font ?? list.Font, bounds, Text,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
                 TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
             e.Graphics.DrawLine(divider, e.Bounds.Left, e.Bounds.Bottom - 1,
