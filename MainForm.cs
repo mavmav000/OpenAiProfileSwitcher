@@ -30,6 +30,7 @@ public sealed class MainForm : Form
         MinimumSize = new Size(760, 480);
         Size = new Size(980, 620);
         Font = new Font("Segoe UI", 9F);
+        DarkTheme.StyleForm(this);
 
         BuildUi();
         RefreshClients();
@@ -44,7 +45,7 @@ public sealed class MainForm : Form
             ColumnCount = 1,
             RowCount = 5,
             Padding = new Padding(18),
-            BackColor = Color.FromArgb(248, 249, 251)
+            BackColor = DarkTheme.Background
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -58,7 +59,7 @@ public sealed class MainForm : Form
             Text = "OpenAI Desktop Profiles",
             AutoSize = true,
             Font = new Font("Segoe UI Semibold", 18F),
-            ForeColor = Color.FromArgb(25, 30, 36),
+            ForeColor = DarkTheme.Text,
             Margin = new Padding(0, 0, 0, 4)
         };
         root.Controls.Add(title, 0, 0);
@@ -68,7 +69,7 @@ public sealed class MainForm : Form
             Text = "Launch separate local profiles for the installed Codex or ChatGPT desktop client.\n" +
                    "Sign in through the official client; this manager never reads or stores passwords, cookies, or tokens.",
             AutoSize = true,
-            ForeColor = Color.FromArgb(75, 82, 92),
+            ForeColor = DarkTheme.SecondaryText,
             Margin = new Padding(0, 0, 0, 14)
         };
         root.Controls.Add(explanation, 0, 1);
@@ -97,6 +98,7 @@ public sealed class MainForm : Form
         clientPanel.Controls.Add(clientLabel, 0, 0);
 
         _clientPicker.DropDownStyle = ComboBoxStyle.DropDownList;
+        DarkTheme.StyleComboBox(_clientPicker);
         _clientPicker.Dock = DockStyle.Fill;
         _clientPicker.Margin = new Padding(0, 0, 8, 0);
         _clientPicker.SelectedIndexChanged += (_, _) => UseSelectedClient();
@@ -112,14 +114,15 @@ public sealed class MainForm : Form
 
         _clientPath.ReadOnly = true;
         _clientPath.BorderStyle = BorderStyle.None;
-        _clientPath.BackColor = Color.FromArgb(248, 249, 251);
-        _clientPath.ForeColor = Color.FromArgb(105, 112, 122);
+        _clientPath.BackColor = DarkTheme.Background;
+        _clientPath.ForeColor = DarkTheme.SecondaryText;
         _clientPath.Dock = DockStyle.Fill;
         _clientPath.Margin = new Padding(0, 4, 0, 0);
         clientPanel.Controls.Add(_clientPath, 1, 1);
         clientPanel.SetColumnSpan(_clientPath, 3);
 
         _sharedCodexCheck.AutoSize = true;
+        DarkTheme.StyleCheckBox(_sharedCodexCheck);
         _sharedCodexCheck.Text = "Share Codex data across profiles (experimental; one profile at a time)";
         _sharedCodexCheck.Checked = _settings.SharedCodexHome;
         _sharedCodexCheck.Margin = new Padding(0, 12, 0, 0);
@@ -129,8 +132,9 @@ public sealed class MainForm : Form
 
         _profileList.Dock = DockStyle.Fill;
         _profileList.View = View.Details;
+        DarkTheme.StyleListView(_profileList);
         _profileList.FullRowSelect = true;
-        _profileList.GridLines = true;
+        _profileList.GridLines = false;
         _profileList.HideSelection = false;
         _profileList.MultiSelect = false;
         _profileList.Columns.Add("Profile", 190);
@@ -155,8 +159,7 @@ public sealed class MainForm : Form
         actionPanel.Controls.Add(addButton);
 
         _launchButton = MakeButton("Launch selected", 125);
-        _launchButton.BackColor = Color.FromArgb(16, 104, 219);
-        _launchButton.ForeColor = Color.White;
+        DarkTheme.StyleButton(_launchButton, primary: true);
         _launchButton.Click += (_, _) => LaunchSelected();
         actionPanel.Controls.Add(_launchButton);
 
@@ -173,22 +176,23 @@ public sealed class MainForm : Form
         actionPanel.Controls.Add(forgetButton);
 
         _status.AutoSize = true;
-        _status.ForeColor = Color.FromArgb(75, 82, 92);
+        _status.ForeColor = DarkTheme.SecondaryText;
         _status.Margin = new Padding(8, 8, 0, 0);
         actionPanel.Controls.Add(_status);
     }
 
     private static Button MakeButton(string text, int width)
     {
-        return new Button
+        var button = new Button
         {
             Text = text,
             AutoSize = false,
             Width = width,
             Height = 32,
-            FlatStyle = FlatStyle.System,
             Margin = new Padding(0, 0, 8, 0)
         };
+        DarkTheme.StyleButton(button);
+        return button;
     }
 
     private void RefreshClients()
@@ -257,7 +261,7 @@ public sealed class MainForm : Form
     {
         if (_sharedCodexCheck.Checked && !_settings.SharedCodexHome)
         {
-            var answer = MessageBox.Show(this,
+            var answer = DarkTheme.ShowMessage(this,
                 "Shared mode uses your existing %USERPROFILE%\\.codex directory for every profile, " +
                 "including Codex credentials and session history. It does NOT keep account logins separate.\n\n" +
                 "Back up that directory before enabling shared mode. Close all Codex/ChatGPT desktop windows " +
@@ -378,7 +382,7 @@ public sealed class MainForm : Form
         {
             if (showErrors)
             {
-                MessageBox.Show(this,
+                DarkTheme.ShowMessage(this,
                     "Select the official Codex or ChatGPT desktop executable before launching.",
                     "Client not found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
@@ -393,7 +397,7 @@ public sealed class MainForm : Form
                 "Shared mode cannot safely run multiple account windows at once.";
             if (showErrors)
             {
-                MessageBox.Show(this, message, "Codex is already running",
+                DarkTheme.ShowMessage(this, message, "Codex is already running",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             SetStatus(message);
@@ -428,7 +432,7 @@ public sealed class MainForm : Form
         {
             if (showErrors)
             {
-                MessageBox.Show(this, ex.Message, "Could not launch client", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                DarkTheme.ShowMessage(this, ex.Message, "Could not launch client", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             return null;
         }
@@ -541,7 +545,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        var result = MessageBox.Show(this,
+        var result = DarkTheme.ShowMessage(this,
             $"Remove “{profile.Label}” from this manager?\n\nThe local profile directory will be kept, so its saved session is not deleted.",
             "Forget profile", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
         if (result != DialogResult.OK)
@@ -606,7 +610,7 @@ public sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Could not save local settings", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            DarkTheme.ShowMessage(this, ex.Message, "Could not save local settings", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -699,6 +703,7 @@ internal sealed class ProfileDialog : Form
         ShowInTaskbar = false;
         ClientSize = new Size(420, 145);
         Font = new Font("Segoe UI", 9F);
+        DarkTheme.StyleForm(this);
 
         var label = new Label
         {
@@ -711,6 +716,7 @@ internal sealed class ProfileDialog : Form
         _labelBox.Location = new Point(16, 45);
         _labelBox.Width = 388;
         _labelBox.MaxLength = 80;
+        DarkTheme.StyleTextBox(_labelBox);
         _labelBox.KeyDown += (_, e) =>
         {
             if (e.KeyCode == Keys.Enter) { DialogResult = DialogResult.OK; Close(); }
@@ -724,6 +730,7 @@ internal sealed class ProfileDialog : Form
             Location = new Point(238, 91),
             Width = 80
         };
+        DarkTheme.StyleButton(cancel);
         Controls.Add(cancel);
 
         var add = new Button
@@ -733,6 +740,7 @@ internal sealed class ProfileDialog : Form
             Location = new Point(324, 91),
             Width = 80
         };
+        DarkTheme.StyleButton(add, primary: true);
         Controls.Add(add);
         AcceptButton = add;
         CancelButton = cancel;
@@ -742,7 +750,7 @@ internal sealed class ProfileDialog : Form
     {
         if (DialogResult == DialogResult.OK && string.IsNullOrWhiteSpace(ProfileLabel))
         {
-            MessageBox.Show(this, "Enter a label for this profile.", "Label required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            DarkTheme.ShowMessage(this, "Enter a label for this profile.", "Label required", MessageBoxButtons.OK, MessageBoxIcon.Information);
             e.Cancel = true;
             return;
         }
