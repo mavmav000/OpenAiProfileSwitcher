@@ -14,6 +14,7 @@ public sealed class MainForm : Form
     private readonly SettingsStore _store = new();
     private AppSettings _settings;
     private readonly ComboBox _clientPicker = new();
+    private readonly CheckBox _sharedCodexCheck = new();
     private readonly TextBox _clientPath = new();
     private readonly ListView _profileList = new();
     private readonly Label _status = new();
@@ -76,7 +77,7 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Top,
             ColumnCount = 4,
-            RowCount = 2,
+            RowCount = 3,
             AutoSize = true,
             Margin = new Padding(0, 0, 0, 12)
         };
@@ -117,6 +118,14 @@ public sealed class MainForm : Form
         _clientPath.Margin = new Padding(0, 4, 0, 0);
         clientPanel.Controls.Add(_clientPath, 1, 1);
         clientPanel.SetColumnSpan(_clientPath, 3);
+
+        _sharedCodexCheck.AutoSize = true;
+        _sharedCodexCheck.Text = "Share Codex data across profiles (experimental; one profile at a time)";
+        _sharedCodexCheck.Checked = _settings.SharedCodexHome;
+        _sharedCodexCheck.Margin = new Padding(0, 12, 0, 0);
+        _sharedCodexCheck.CheckedChanged += SharedCodexCheckChanged;
+        clientPanel.Controls.Add(_sharedCodexCheck, 0, 2);
+        clientPanel.SetColumnSpan(_sharedCodexCheck, 4);
 
         _profileList.Dock = DockStyle.Fill;
         _profileList.View = View.Details;
@@ -244,6 +253,34 @@ public sealed class MainForm : Form
         SetStatus("Client selected.");
     }
 
+    private void SharedCodexCheckChanged(object? sender, EventArgs e)
+    {
+        if (_sharedCodexCheck.Checked && !_settings.SharedCodexHome)
+        {
+            var answer = MessageBox.Show(this,
+                "Shared mode uses your existing %USERPROFILE%\\.codex directory for every profile, " +
+                "including Codex credentials and session history. It does NOT keep account logins separate.\n\n" +
+                "Back up that directory before enabling shared mode. Close all Codex/ChatGPT desktop windows " +
+                "before switching accounts. Only one profile can be launched at a time.\n\n" +
+                "Existing conversations may still be account-bound and might not resume under another login.\n\n" +
+                "Enable experimental shared mode?",
+                "Enable shared Codex data?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+            if (answer != DialogResult.Yes)
+            {
+                _sharedCodexCheck.Checked = false;
+                return;
+            }
+        }
+
+        _settings.SharedCodexHome = _sharedCodexCheck.Checked;
+        SaveSettings();
+        RefreshProfiles();
+        SetStatus(_settings.SharedCodexHome
+            ? "Shared mode enabled: close all Codex windows before launching or switching profiles."
+            : "Isolated profile mode enabled. Existing shared data was not moved or deleted.");
+    }
+
     private void AddProfile()
     {
         using var dialog = new ProfileDialog();
@@ -291,6 +328,12 @@ public sealed class MainForm : Form
 
     private async Task LaunchAllAsync()
     {
+        if (_settings.SharedCodexHome)
+        {
+            SetStatus("Launch all is disabled in shared mode to prevent concurrent writes to Codex state.");
+            return;
+        }
+
         if (_settings.Profiles.Count == 0)
         {
             SetStatus("Add a profile first.");
@@ -324,7 +367,7 @@ public sealed class MainForm : Form
         {
             RefreshProfiles();
             _launchButton.Enabled = _profileList.Items.Count > 0;
-            _launchAllButton.Enabled = _settings.Profiles.Count > 0;
+            _launchAllButton.Enabled = _settings.Profiles.Count > 0 && !_settings.SharedCodexHome;
         }
     }
 
@@ -342,6 +385,21 @@ public sealed class MainForm : Form
             return null;
         }
 
+        // Shared Codex homes include an authentication file and a writable session database.
+        // Refuse to launch another Codex window while a recognized desktop process is running.
+        if (_settings.SharedCodexHome && IsOpenAiDesktopRunning())
+        {
+            const string message = "Close every Codex/ChatGPT desktop window before launching a shared profile. " +
+                "Shared mode cannot safely run multiple account windows at once.";
+            if (showErrors)
+            {
+                MessageBox.Show(this, message, "Codex is already running",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            SetStatus(message);
+            return null;
+        }
+
         try
         {
             Directory.CreateDirectory(profile.UserDataDirectory);
@@ -355,7 +413,7 @@ public sealed class MainForm : Form
             startInfo.ArgumentList.Add("--new-window");
             startInfo.ArgumentList.Add("--no-first-run");
             startInfo.ArgumentList.Add("--no-default-browser-check");
-            ConfigureProfileEnvironment(startInfo, profile.UserDataDirectory);
+            ConfigureProfileEnvironment(startInfo, profile.UserDataDirectory, _settings.SharedCodexHome);
             var process = Process.Start(startInfo);
             if (process is null)
             {
@@ -405,13 +463,42 @@ public sealed class MainForm : Form
         }
     }
 
-    private static void ConfigureProfileEnvironment(ProcessStartInfo startInfo, string profileDirectory)
+    private static bool IsOpenAiDesktopRunning()
+    {
+        foreach (var processName in new[] { "ChatGPT", "ChatGPT Classic", "Codex" })
+        {
+            Process[] processes;
+            try { processes = Process.GetProcessesByName(processName); }
+            catch { return true; } // Fail closed if processes cannot be inspected.
+
+            try
+            {
+                foreach (var process in processes)
+                {
+                    try { if (!process.HasExited) return true; }
+                    catch { return true; }
+                }
+            }
+            finally
+            {
+                foreach (var process in processes) process.Dispose();
+            }
+        }
+        return false;
+    }
+
+    private static void ConfigureProfileEnvironment(
+        ProcessStartInfo startInfo, string profileDirectory, bool sharedCodexHome)
     {
         var runtimeDirectory = Path.Combine(profileDirectory, "runtime");
         var roamingDirectory = Path.Combine(runtimeDirectory, "AppData", "Roaming");
         var localDirectory = Path.Combine(runtimeDirectory, "AppData", "Local");
         var tempDirectory = Path.Combine(runtimeDirectory, "Temp");
-        var codexHomeDirectory = Path.Combine(runtimeDirectory, "CodexHome");
+        // Sharing the default home retains the existing Codex sessions/settings rather than
+        // creating an empty shared directory. Authentication in this home is ALSO shared.
+        var codexHomeDirectory = sharedCodexHome
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex")
+            : Path.Combine(runtimeDirectory, "CodexHome");
 
         Directory.CreateDirectory(roamingDirectory);
         Directory.CreateDirectory(localDirectory);
@@ -494,6 +581,7 @@ public sealed class MainForm : Form
         }
 
         _launchButton.Enabled = _profileList.Items.Count > 0;
+        _launchAllButton.Enabled = _profileList.Items.Count > 0 && !_settings.SharedCodexHome;
     }
 
     private void SelectProfile(string id)
