@@ -19,6 +19,10 @@ For a self-contained Windows x64 executable:
 dotnet publish .\OpenAIProfileSwitcher.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output .\dist
 ```
 
+## Appearance
+
+The Windows launcher uses a permanent dark color scheme; there is **no light-mode toggle**. The main form, profile dialog, list headers/rows, buttons, inputs, and app confirmation dialogs are dark. Windows title bars request the native DWM dark-caption style on supported systems. The system's own file picker may still follow your Windows theme.
+
 ## Usage
 
 1. Start the launcher.
