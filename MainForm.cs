@@ -14,6 +14,7 @@ public sealed class MainForm : Form
     private readonly SettingsStore _store = new();
     private AppSettings _settings;
     private readonly ComboBox _clientPicker = new();
+    private readonly CheckBox _sharedCodexCheck = new();
     private readonly TextBox _clientPath = new();
     private readonly ListView _profileList = new();
     private readonly Label _status = new();
@@ -29,6 +30,7 @@ public sealed class MainForm : Form
         MinimumSize = new Size(760, 480);
         Size = new Size(980, 620);
         Font = new Font("Segoe UI", 9F);
+        DarkTheme.StyleForm(this);
 
         BuildUi();
         RefreshClients();
@@ -43,7 +45,7 @@ public sealed class MainForm : Form
             ColumnCount = 1,
             RowCount = 5,
             Padding = new Padding(18),
-            BackColor = Color.FromArgb(248, 249, 251)
+            BackColor = DarkTheme.Background
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -57,7 +59,7 @@ public sealed class MainForm : Form
             Text = "OpenAI Desktop Profiles",
             AutoSize = true,
             Font = new Font("Segoe UI Semibold", 18F),
-            ForeColor = Color.FromArgb(25, 30, 36),
+            ForeColor = DarkTheme.Text,
             Margin = new Padding(0, 0, 0, 4)
         };
         root.Controls.Add(title, 0, 0);
@@ -67,7 +69,7 @@ public sealed class MainForm : Form
             Text = "Launch separate local profiles for the installed Codex or ChatGPT desktop client.\n" +
                    "Sign in through the official client; this manager never reads or stores passwords, cookies, or tokens.",
             AutoSize = true,
-            ForeColor = Color.FromArgb(75, 82, 92),
+            ForeColor = DarkTheme.SecondaryText,
             Margin = new Padding(0, 0, 0, 14)
         };
         root.Controls.Add(explanation, 0, 1);
@@ -76,7 +78,7 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Top,
             ColumnCount = 4,
-            RowCount = 2,
+            RowCount = 3,
             AutoSize = true,
             Margin = new Padding(0, 0, 0, 12)
         };
@@ -96,6 +98,7 @@ public sealed class MainForm : Form
         clientPanel.Controls.Add(clientLabel, 0, 0);
 
         _clientPicker.DropDownStyle = ComboBoxStyle.DropDownList;
+        DarkTheme.StyleComboBox(_clientPicker);
         _clientPicker.Dock = DockStyle.Fill;
         _clientPicker.Margin = new Padding(0, 0, 8, 0);
         _clientPicker.SelectedIndexChanged += (_, _) => UseSelectedClient();
@@ -111,17 +114,27 @@ public sealed class MainForm : Form
 
         _clientPath.ReadOnly = true;
         _clientPath.BorderStyle = BorderStyle.None;
-        _clientPath.BackColor = Color.FromArgb(248, 249, 251);
-        _clientPath.ForeColor = Color.FromArgb(105, 112, 122);
+        _clientPath.BackColor = DarkTheme.Background;
+        _clientPath.ForeColor = DarkTheme.SecondaryText;
         _clientPath.Dock = DockStyle.Fill;
         _clientPath.Margin = new Padding(0, 4, 0, 0);
         clientPanel.Controls.Add(_clientPath, 1, 1);
         clientPanel.SetColumnSpan(_clientPath, 3);
 
+        _sharedCodexCheck.AutoSize = true;
+        DarkTheme.StyleCheckBox(_sharedCodexCheck);
+        _sharedCodexCheck.Text = "Share Codex data across profiles (experimental; one profile at a time)";
+        _sharedCodexCheck.Checked = _settings.SharedCodexHome;
+        _sharedCodexCheck.Margin = new Padding(0, 12, 0, 0);
+        _sharedCodexCheck.CheckedChanged += SharedCodexCheckChanged;
+        clientPanel.Controls.Add(_sharedCodexCheck, 0, 2);
+        clientPanel.SetColumnSpan(_sharedCodexCheck, 4);
+
         _profileList.Dock = DockStyle.Fill;
         _profileList.View = View.Details;
+        DarkTheme.StyleListView(_profileList);
         _profileList.FullRowSelect = true;
-        _profileList.GridLines = true;
+        _profileList.GridLines = false;
         _profileList.HideSelection = false;
         _profileList.MultiSelect = false;
         _profileList.Columns.Add("Profile", 190);
@@ -146,8 +159,7 @@ public sealed class MainForm : Form
         actionPanel.Controls.Add(addButton);
 
         _launchButton = MakeButton("Launch selected", 125);
-        _launchButton.BackColor = Color.FromArgb(16, 104, 219);
-        _launchButton.ForeColor = Color.White;
+        DarkTheme.StyleButton(_launchButton, primary: true);
         _launchButton.Click += (_, _) => LaunchSelected();
         actionPanel.Controls.Add(_launchButton);
 
@@ -164,22 +176,23 @@ public sealed class MainForm : Form
         actionPanel.Controls.Add(forgetButton);
 
         _status.AutoSize = true;
-        _status.ForeColor = Color.FromArgb(75, 82, 92);
+        _status.ForeColor = DarkTheme.SecondaryText;
         _status.Margin = new Padding(8, 8, 0, 0);
         actionPanel.Controls.Add(_status);
     }
 
     private static Button MakeButton(string text, int width)
     {
-        return new Button
+        var button = new Button
         {
             Text = text,
             AutoSize = false,
             Width = width,
             Height = 32,
-            FlatStyle = FlatStyle.System,
             Margin = new Padding(0, 0, 8, 0)
         };
+        DarkTheme.StyleButton(button);
+        return button;
     }
 
     private void RefreshClients()
@@ -244,6 +257,34 @@ public sealed class MainForm : Form
         SetStatus("Client selected.");
     }
 
+    private void SharedCodexCheckChanged(object? sender, EventArgs e)
+    {
+        if (_sharedCodexCheck.Checked && !_settings.SharedCodexHome)
+        {
+            var answer = DarkTheme.ShowMessage(this,
+                "Shared mode uses your existing %USERPROFILE%\\.codex directory for every profile, " +
+                "including Codex credentials and session history. It does NOT keep account logins separate.\n\n" +
+                "Back up that directory before enabling shared mode. Close all Codex/ChatGPT desktop windows " +
+                "before switching accounts. Only one profile can be launched at a time.\n\n" +
+                "Existing conversations may still be account-bound and might not resume under another login.\n\n" +
+                "Enable experimental shared mode?",
+                "Enable shared Codex data?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+            if (answer != DialogResult.Yes)
+            {
+                _sharedCodexCheck.Checked = false;
+                return;
+            }
+        }
+
+        _settings.SharedCodexHome = _sharedCodexCheck.Checked;
+        SaveSettings();
+        RefreshProfiles();
+        SetStatus(_settings.SharedCodexHome
+            ? "Shared mode enabled: close all Codex windows before launching or switching profiles."
+            : "Isolated profile mode enabled. Existing shared data was not moved or deleted.");
+    }
+
     private void AddProfile()
     {
         using var dialog = new ProfileDialog();
@@ -291,6 +332,12 @@ public sealed class MainForm : Form
 
     private async Task LaunchAllAsync()
     {
+        if (_settings.SharedCodexHome)
+        {
+            SetStatus("Launch all is disabled in shared mode to prevent concurrent writes to Codex state.");
+            return;
+        }
+
         if (_settings.Profiles.Count == 0)
         {
             SetStatus("Add a profile first.");
@@ -324,7 +371,7 @@ public sealed class MainForm : Form
         {
             RefreshProfiles();
             _launchButton.Enabled = _profileList.Items.Count > 0;
-            _launchAllButton.Enabled = _settings.Profiles.Count > 0;
+            _launchAllButton.Enabled = _settings.Profiles.Count > 0 && !_settings.SharedCodexHome;
         }
     }
 
@@ -335,10 +382,25 @@ public sealed class MainForm : Form
         {
             if (showErrors)
             {
-                MessageBox.Show(this,
+                DarkTheme.ShowMessage(this,
                     "Select the official Codex or ChatGPT desktop executable before launching.",
                     "Client not found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+            return null;
+        }
+
+        // Shared Codex homes include an authentication file and a writable session database.
+        // Refuse to launch another Codex window while a recognized desktop process is running.
+        if (_settings.SharedCodexHome && IsOpenAiDesktopRunning())
+        {
+            const string message = "Close every Codex/ChatGPT desktop window before launching a shared profile. " +
+                "Shared mode cannot safely run multiple account windows at once.";
+            if (showErrors)
+            {
+                DarkTheme.ShowMessage(this, message, "Codex is already running",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            SetStatus(message);
             return null;
         }
 
@@ -355,7 +417,7 @@ public sealed class MainForm : Form
             startInfo.ArgumentList.Add("--new-window");
             startInfo.ArgumentList.Add("--no-first-run");
             startInfo.ArgumentList.Add("--no-default-browser-check");
-            ConfigureProfileEnvironment(startInfo, profile.UserDataDirectory);
+            ConfigureProfileEnvironment(startInfo, profile.UserDataDirectory, _settings.SharedCodexHome);
             var process = Process.Start(startInfo);
             if (process is null)
             {
@@ -370,7 +432,7 @@ public sealed class MainForm : Form
         {
             if (showErrors)
             {
-                MessageBox.Show(this, ex.Message, "Could not launch client", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                DarkTheme.ShowMessage(this, ex.Message, "Could not launch client", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             return null;
         }
@@ -405,13 +467,42 @@ public sealed class MainForm : Form
         }
     }
 
-    private static void ConfigureProfileEnvironment(ProcessStartInfo startInfo, string profileDirectory)
+    private static bool IsOpenAiDesktopRunning()
+    {
+        foreach (var processName in new[] { "ChatGPT", "ChatGPT Classic", "Codex" })
+        {
+            Process[] processes;
+            try { processes = Process.GetProcessesByName(processName); }
+            catch { return true; } // Fail closed if processes cannot be inspected.
+
+            try
+            {
+                foreach (var process in processes)
+                {
+                    try { if (!process.HasExited) return true; }
+                    catch { return true; }
+                }
+            }
+            finally
+            {
+                foreach (var process in processes) process.Dispose();
+            }
+        }
+        return false;
+    }
+
+    private static void ConfigureProfileEnvironment(
+        ProcessStartInfo startInfo, string profileDirectory, bool sharedCodexHome)
     {
         var runtimeDirectory = Path.Combine(profileDirectory, "runtime");
         var roamingDirectory = Path.Combine(runtimeDirectory, "AppData", "Roaming");
         var localDirectory = Path.Combine(runtimeDirectory, "AppData", "Local");
         var tempDirectory = Path.Combine(runtimeDirectory, "Temp");
-        var codexHomeDirectory = Path.Combine(runtimeDirectory, "CodexHome");
+        // Sharing the default home retains the existing Codex sessions/settings rather than
+        // creating an empty shared directory. Authentication in this home is ALSO shared.
+        var codexHomeDirectory = sharedCodexHome
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex")
+            : Path.Combine(runtimeDirectory, "CodexHome");
 
         Directory.CreateDirectory(roamingDirectory);
         Directory.CreateDirectory(localDirectory);
@@ -454,7 +545,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        var result = MessageBox.Show(this,
+        var result = DarkTheme.ShowMessage(this,
             $"Remove “{profile.Label}” from this manager?\n\nThe local profile directory will be kept, so its saved session is not deleted.",
             "Forget profile", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
         if (result != DialogResult.OK)
@@ -494,6 +585,7 @@ public sealed class MainForm : Form
         }
 
         _launchButton.Enabled = _profileList.Items.Count > 0;
+        _launchAllButton.Enabled = _profileList.Items.Count > 0 && !_settings.SharedCodexHome;
     }
 
     private void SelectProfile(string id)
@@ -518,7 +610,7 @@ public sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Could not save local settings", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            DarkTheme.ShowMessage(this, ex.Message, "Could not save local settings", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -611,6 +703,7 @@ internal sealed class ProfileDialog : Form
         ShowInTaskbar = false;
         ClientSize = new Size(420, 145);
         Font = new Font("Segoe UI", 9F);
+        DarkTheme.StyleForm(this);
 
         var label = new Label
         {
@@ -623,6 +716,7 @@ internal sealed class ProfileDialog : Form
         _labelBox.Location = new Point(16, 45);
         _labelBox.Width = 388;
         _labelBox.MaxLength = 80;
+        DarkTheme.StyleTextBox(_labelBox);
         _labelBox.KeyDown += (_, e) =>
         {
             if (e.KeyCode == Keys.Enter) { DialogResult = DialogResult.OK; Close(); }
@@ -636,6 +730,7 @@ internal sealed class ProfileDialog : Form
             Location = new Point(238, 91),
             Width = 80
         };
+        DarkTheme.StyleButton(cancel);
         Controls.Add(cancel);
 
         var add = new Button
@@ -645,6 +740,7 @@ internal sealed class ProfileDialog : Form
             Location = new Point(324, 91),
             Width = 80
         };
+        DarkTheme.StyleButton(add, primary: true);
         Controls.Add(add);
         AcceptButton = add;
         CancelButton = cancel;
@@ -654,7 +750,7 @@ internal sealed class ProfileDialog : Form
     {
         if (DialogResult == DialogResult.OK && string.IsNullOrWhiteSpace(ProfileLabel))
         {
-            MessageBox.Show(this, "Enter a label for this profile.", "Label required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            DarkTheme.ShowMessage(this, "Enter a label for this profile.", "Label required", MessageBoxButtons.OK, MessageBoxIcon.Information);
             e.Cancel = true;
             return;
         }

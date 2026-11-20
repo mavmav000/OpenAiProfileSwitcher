@@ -17,6 +17,7 @@ public sealed class AccountProfile
 public sealed class AppSettings
 {
     public string? ClientPath { get; set; }
+    public bool SharedCodexHome { get; set; } = false;
     public List<AccountProfile> Profiles { get; set; } = new();
 }
 
